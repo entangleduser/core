@@ -1,0 +1,39 @@
+%{
+ import re
+ file = open('descriptors', 'r')
+ descriptors = set()
+ 
+ for word in file:
+  value = word.rstrip()
+  key = re.sub('[^\w\s]', " ", value)
+  key = re.sub(" +", " ", key)
+  split = key.split(" ")
+  
+  if len(split) > 1:
+   first = split[0].lower()
+   split.pop(0)
+   split = [substring.title() for substring in split]
+   split.insert(0, first)
+   key = "".join(split)
+  else:
+   escaped = open('escaped', 'r')
+   if key in [word.rstrip() for word in escaped]:
+    key = "`% s`" % key
+    
+  descriptors.add(tuple([key, value]))
+  array = list(descriptors)
+  array.sort()
+}%
+public extension Descriptor {
+ % for (key, value) in array:
+ static var ${key}: Descriptor { "${value}" }
+ % end
+}
+
+extension Descriptor: CaseIterable {
+ public static var allCases: Set<Self> = [
+ % for (key, value) in array:
+ .${key},
+ % end
+ ]
+}

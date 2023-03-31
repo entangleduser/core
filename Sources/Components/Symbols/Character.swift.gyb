@@ -1,0 +1,81 @@
+/// https://www.utf8-chartable.de/unicode-utf8-table.pl?number=1024&names=2&utf8=0x
+%{
+/// - Note: Unique values can be generated in a seperate file but should be based on the
+//  original format of the input document but would require a custom command
+// (simple csv is recommended)
+/// MARK: Structure
+struct UnicodeValue: Decodable, Hashable {
+ let codePoint: String
+ let character: Character?
+ let hex: CChar
+ let name: String?
+ let deprecatedName: String?
+}
+extension UnicodeValue {
+ var isInvisible: Bool { character == nil }
+ var propertyName: String? { name == "<control>" ? nil : name ?? deprecatedName }
+ var escapedName: String? { 
+  guard let name = propertyName else { return nil }
+  // convert to camel case
+  
+  // escape if needed
+  return name
+ }
+}
+// MARK: Generate static Character
+import CodableCSV // /volumes/primary/users/william/desktop/hidden/github/codablecsv
+import Files // /volumes/primary/users/william/desktop/hidden/github/files
+let file = try File(path: "unicodestandard.csv")
+// TODO: Import automatically
+let escaped = try File(path: "unicodestandard.csv")
+// load all values from csv as an array
+let decoder = CSVDecoder()
+decoder.headerStrategy = .none
+let values = try decoder.decode([UnicodeValue].self, from: file.read())
+
+var characters: KeyValuePairs<String, String> = 
+values.compactMap({ unicode in
+  guard let key = unicode.escapedName else { return nil }
+  return (key, unicode.codePoint)
+})
+}%
+public extension Character {
+ %{
+ for (key, value) in characters:
+  static let ${key} = Self("${value}")
+ }%
+}
+
+extension Character: CaseIterable {
+ public static let allCases: Set<Self> = [
+  %{
+  for (key, _) in characters:
+   .${key},
+  }%
+ ]
+}
+%{
+// MARK: Generate static CChar
+// generate key pairs for <name, string> to generate `CChar` dictionary
+let cCharacters: KeyValuePairs<String, CChar> = 
+values.compactMap({ unicode in
+  guard let key = unicode.escapedName else { return nil }
+  return (key, unicode.hex)
+})
+}%
+
+public extension CChar {
+ %{
+ for (key, value) in cCharacters:
+  static let ${key}: Self = ${value}
+ }%
+}
+
+extension CChar: CaseIterable {
+ public static let allCases: Set<Self> = [
+  %{
+  for (key, _) in cCharacters:
+   .${key},
+  }%
+ ]
+}
