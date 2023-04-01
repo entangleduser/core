@@ -14,7 +14,9 @@ let package = Package(
  ],
  dependencies: [
   .package(url: "https://github.com/apple/swift-numerics", branch: "main"),
-  .package(url: "https://github.com/apple/swift-atomics", branch: "main"),
+  .package(
+   url: "https://github.com/apple/swift-atomics", .upToNextMajor(from: "1.0.3")
+  ),
   .package(url: "https://github.com/apple/swift-collections", branch: "main")
  ],
  targets: [
