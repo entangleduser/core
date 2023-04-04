@@ -64,7 +64,8 @@ struct Graphex<Base>: GraphicalIndex where
  Base: RangeReplaceableCollection &
  MutableCollection & BidirectionalCollection &
  ExpressibleByArrayLiteral & ExpressibleAsEmpty,
- Base.Index: Hashable & Comparable & AtomicValue & Infallible {
+ Base.Index: Hashable & Comparable & AtomicValue & Infallible,
+Base.Index.AtomicRepresentation.Value == Base.Index {
  // - MARK: Starting properties
  init() {}
  @DefaultAtomic var index: Base.Index

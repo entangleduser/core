@@ -15,7 +15,8 @@
  }
 }
 
-@propertyWrapper public struct DefaultAtomic<Value: AtomicValue & Infallible> {
+@propertyWrapper public struct DefaultAtomic<Value: AtomicValue & Infallible>
+where Value.AtomicRepresentation.Value == Value {
  public init() {}
  public init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
 

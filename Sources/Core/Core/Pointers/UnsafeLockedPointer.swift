@@ -1,7 +1,8 @@
 import Atomics
 @propertyWrapper
 struct UnsafeLockedPointer<Base: RangeReplaceableCollection>
-where Base.Index: Hashable & Comparable & AtomicValue & Infallible {
+where Base.Index: Hashable & Comparable & AtomicValue & Infallible,
+Base.Index.AtomicRepresentation.Value == Base.Index {
  internal init(pointer: UnsafeMutablePointer<Base>? = nil, index: Index) {
   self.pointer = pointer
   self.index = index
