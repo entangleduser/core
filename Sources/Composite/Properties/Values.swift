@@ -1,7 +1,8 @@
 @_exported import Core
 @_exported import Extensions
 @_exported import OrderedCollections
-protocol KeyValues: Infallible, CustomReflectable, CustomStringConvertible {
+
+public protocol KeyValues: Infallible, CustomReflectable, CustomStringConvertible {
  var values: [String: Any] { get set }
  /// The default values for describing purposes
  static var defaultValues: OrderedDictionary<String, Any> { get }
@@ -9,12 +10,14 @@ protocol KeyValues: Infallible, CustomReflectable, CustomStringConvertible {
  subscript<A: ResolvedKey>(_ type: A.Type) -> A.ResolvedValue { get set }
 }
 
-extension KeyValues {
+public extension KeyValues {
+ @_disfavoredOverload
  subscript<A: ResolvedKey>(_ type: A.Type) -> A.ResolvedValue {
   get { A.resolveValue(values[type.description] as? A.Value) }
   set { values[type.description] = A.storeValue(newValue) }
  }
 
+ @_disfavoredOverload
  subscript<A: ResolvedKey>(_ type: A.Type, default: A.ResolvedValue) -> A.ResolvedValue {
   get { A.resolveValue(values[type.description, default: `default`] as? A.Value) }
   set {
@@ -51,7 +54,7 @@ extension KeyValues {
  }
 }
 
-extension KeyValues {
+public extension KeyValues {
  static var defaultValue: Self { Self() }
  static var defaultValues: OrderedDictionary<String, Any> { .empty }
 

@@ -1,24 +1,26 @@
 @_exported import Core
-@_exported import struct Foundation.Date
-typealias AnyPropertyKey = any PropertyKey
-protocol PropertyKey: Hashable, CustomStringConvertible {
+import struct Foundation.Date
+import struct Foundation.Data
+
+public typealias AnyPropertyKey = any PropertyKey
+public protocol PropertyKey: Hashable, CustomStringConvertible {
  associatedtype Value
 }
 
-extension PropertyKey {
+public extension PropertyKey {
  static var description: String { "\(Self.self)" }
  var description: String { Self.description }
 }
 
-typealias AnyResolvedKey = any ResolvedKey
-protocol ResolvedKey: PropertyKey {
+public typealias AnyResolvedKey = any ResolvedKey
+public protocol ResolvedKey: PropertyKey {
  associatedtype Value
  associatedtype ResolvedValue
  static func resolveValue(_ value: Value?) -> ResolvedValue
  static func storeValue(_ value: ResolvedValue?) -> Value?
 }
 
-extension ResolvedKey {
+public extension ResolvedKey {
  static var resolvedValue: ResolvedValue { resolveValue(nil) }
  static var customMirror: Mirror {
   Mirror(Self.self, children: [description: resolveValue])
@@ -34,38 +36,38 @@ extension ResolvedKey {
  }
 }
 
-protocol OptionalKey: PropertyKey {
+public protocol OptionalKey: PropertyKey {
  override associatedtype Value
  typealias ResolvedValue = Value?
 }
 
-extension OptionalKey {
- static func resolveValue(_ value: Value?) -> Value? { nil }
+public extension OptionalKey {
+ static func resolveValue(_ value: Value?) -> Value? { value }
  static func storeValue(_ value: ResolvedValue?) -> Value? { value ?? nil }
 }
 
-protocol DefaultKey: ResolvedKey where ResolvedValue == Value {
+public protocol DefaultKey: ResolvedKey where ResolvedValue == Value {
  override associatedtype ResolvedValue = Value
  static var defaultValue: Value { get }
 }
 
-extension DefaultKey {
+public extension DefaultKey {
  static func resolveValue(_ value: Value?) -> ResolvedValue { defaultValue }
  static func storeValue(_ value: ResolvedValue?) -> Value? {
   value ?? defaultValue
  }
 }
 
-extension DefaultKey where Value: Infallible {
+public extension DefaultKey where Value: Infallible {
  static var defaultValue: Value { Value.defaultValue }
 }
 
-protocol IntBoolKey: ResolvedKey {
+public protocol IntBoolKey: ResolvedKey {
  override associatedtype Value = Int
  override associatedtype ResolvedValue = Bool
 }
 
-extension IntBoolKey {
+public extension IntBoolKey {
  static func resolveValue(_ value: Int?) -> Bool {
   guard let value else { return false }
   return value < 1 ? false : true
@@ -77,12 +79,12 @@ extension IntBoolKey {
  }
 }
 
-protocol DoubleDateKey: ResolvedKey {
+public protocol DoubleDateKey: ResolvedKey {
  override associatedtype Value = Double
  override associatedtype ResolvedValue = Date?
 }
 
-extension DoubleDateKey {
+public extension DoubleDateKey {
  static func resolveValue(_ value: Double?) -> Date? {
   guard let value else { return nil }
   return Date(timeIntervalSinceReferenceDate: value)
@@ -91,5 +93,57 @@ extension DoubleDateKey {
  static func storeValue(_ value: Date??) -> Double? {
   guard let value else { return nil }
   return value?.timeIntervalSinceReferenceDate
+ }
+}
+
+/// A key useful for storing auto codable values. Usually, within a defaults
+/// protocol because it can provide uniform access to values
+/// - Note: Using this allows data of all types to use the same key because the
+/// stored value is data and the resolved value is the structure
+@available(macOS 10.15, iOS 13.0, *)
+public protocol AutoCodableKey: ResolvedKey
+where ResolvedValue: AutoCodable, Value == Data {}
+
+@available(macOS 10.15, iOS 13.0, *)
+public extension DecodingError.Context {
+ static var missingData: Self {
+  Self(codingPath: .empty, debugDescription: "Data was missing")
+ }
+}
+
+@available(macOS 10.15, iOS 13.0, *)
+public extension AutoCodableKey {
+ @_disfavoredOverload
+ static func resolveValue(_ data: Data?) -> ResolvedValue {
+  do {
+   guard let data else {
+    throw DecodingError.valueNotFound(ResolvedValue.self, .missingData)
+   }
+   return try ResolvedValue.decoder.decode(ResolvedValue.self, from: data)
+  } catch {
+   fatalError(error.localizedDescription)
+  }
+ }
+
+ static func storeValue(_ value: ResolvedValue?) -> Data? {
+  guard let value else { return nil }
+  do { return try ResolvedValue.encoder.encode(value) }
+  catch {
+   fatalError(error.localizedDescription)
+  }
+ }
+}
+
+@available(macOS 10.15, iOS 13.0, *)
+public extension AutoCodableKey where ResolvedValue: Infallible {
+ static func resolveValue(_ data: Data?) -> ResolvedValue {
+  do {
+   guard let data else {
+    throw DecodingError.valueNotFound(ResolvedValue.self, .missingData)
+   }
+   return try ResolvedValue.decoder.decode(ResolvedValue.self, from: data)
+  } catch {
+   return .defaultValue
+  }
  }
 }

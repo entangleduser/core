@@ -3,7 +3,7 @@ import XCTest
 @testable import Core
 
 final class ExtensionsTests: XCTestCase {
- func testAsyncQueue() async {
+ func testParallel() {
   var index: Parallel<[Int]>.Index = .start
   var count: Int = .zero
   var other: Parallel<[Int]>.Elements = [

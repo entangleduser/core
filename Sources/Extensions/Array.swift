@@ -19,12 +19,7 @@ public extension Array where Element: Equatable {
  }
 }
 
-public extension Array where Element: Hashable {
- @discardableResult mutating func removeDuplicates() -> Self {
-  self = unique()
-  return self
- }
-
+public extension RangeReplaceableCollection where Self: MutableCollection, Element: Hashable {
  @discardableResult mutating func appendUnique(_ element: Element) -> Self {
   if !contains(element) { append(element) }
   return self
@@ -36,9 +31,9 @@ public extension Array where Element: Hashable {
  }
 }
 
-#if canImport(SwiftUI)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) && canImport(SwiftUI)
  import SwiftUI
-
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
  public extension Array {
   @discardableResult mutating func trim(_ index: Index) -> Self {
    guard endIndex > index else { return self }

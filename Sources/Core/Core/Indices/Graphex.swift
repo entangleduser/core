@@ -1,11 +1,11 @@
-protocol RecursiveIndex: Comparable & Equatable where
-Base: ExpressibleByArrayLiteral, Base.Index: Hashable & Comparable {
+public protocol RecursiveIndex: Comparable & Equatable
+where Base: ExpressibleByArrayLiteral, Base.Index: Hashable & Comparable {
  associatedtype Base: MutableCollection
  var offset: Int { get set }
  var index: Base.Index { get set }
 }
 
-extension RecursiveIndex {
+public extension RecursiveIndex {
  static func < (lhs: Self, rhs: Self) -> Bool {
   lhs.offset < rhs.offset && lhs.index < rhs.index
  }
@@ -15,18 +15,18 @@ extension RecursiveIndex {
  }
 }
 
-protocol RecursiveValue {
+public protocol RecursiveValue {
  associatedtype Next: RecursiveValue
  var next: Next? { get }
 }
 
-protocol ReflectiveValue {
+public protocol ReflectiveValue {
  associatedtype Previous: RecursiveValue
  var previous: Previous? { get }
 }
 
 /// A recursive index that stores a value
-protocol IndexicalValue:
+public protocol IndexicalValue:
 Equatable & Comparable, RecursiveValue, ReflectiveValue, RecursiveIndex {
  typealias Element = Self
  typealias Value = Base.Element
@@ -41,37 +41,29 @@ Equatable & Comparable, RecursiveValue, ReflectiveValue, RecursiveIndex {
 }
 
 /// Indexical value with storage for rebasing elements
-protocol GraphicalIndex: IndexicalValue {
+public protocol GraphicalIndex: IndexicalValue {
  var elements: [Self] { get nonmutating set }
  var base: Base { get nonmutating set }
  var value: Value { get nonmutating set }
  var start: Self { get nonmutating set }
- init()
 }
 
-extension GraphicalIndex {
+public extension GraphicalIndex {
  @inlinable static var empty: Self { Self() }
- static func < (lhs: Self, rhs: Self) -> Bool {
-  lhs.offset < rhs.offset && lhs.index < rhs.index
- }
-
- static func == (lhs: Self, rhs: Self) -> Bool {
-  lhs.offset == rhs.offset && lhs.index == rhs.index
- }
 }
 
-struct Graphex<Base>: GraphicalIndex where
+public struct Graphex<Base>: GraphicalIndex where
  Base: RangeReplaceableCollection &
  MutableCollection & BidirectionalCollection &
  ExpressibleByArrayLiteral & ExpressibleAsEmpty,
  Base.Index: Hashable & Comparable & AtomicValue & Infallible,
-Base.Index.AtomicRepresentation.Value == Base.Index {
+ Base.Index.AtomicRepresentation.Value == Base.Index {
  // - MARK: Starting properties
- init() {}
- @DefaultAtomic var index: Base.Index
- @DefaultAtomic var endIndex: Base.Index
- var _base: UnsafeMutableRawBufferPointer?
- @inlinable var base: Base {
+ public init() {}
+ @DefaultAtomic public var index: Base.Index
+ @DefaultAtomic public var endIndex: Base.Index
+ public var _base: UnsafeMutableRawBufferPointer?
+ @inlinable public var base: Base {
   unsafeAddress {
    UnsafePointer(
     _base.unsafelyUnwrapped
@@ -84,15 +76,15 @@ Base.Index.AtomicRepresentation.Value == Base.Index {
   }
  }
 
- @inlinable var value: Value {
+ @inlinable public var value: Value {
   unsafeAddress { withUnsafePointer(to: base[index]) { $0 } }
   nonmutating unsafeMutableAddress {
    withUnsafeMutablePointer(to: &base[index]) { $0 }
   }
  }
 
- var _elements: UnsafeMutableRawBufferPointer?
- @inlinable var elements: [Self] {
+ public var _elements: UnsafeMutableRawBufferPointer?
+ @inlinable public var elements: [Self] {
   unsafeAddress {
    UnsafePointer(
     _elements.unsafelyUnwrapped
@@ -105,10 +97,10 @@ Base.Index.AtomicRepresentation.Value == Base.Index {
   }
  }
 
- var position: Int = .zero
- @DefaultAtomic var offset: Int
- @DefaultAtomic var _start: Int
- @inlinable var start: Self {
+ public var position: Int = .zero
+ @DefaultAtomic public var offset: Int
+ @DefaultAtomic public var _start: Int
+ @inlinable public var start: Self {
   unsafeAddress { withUnsafePointer(to: elements[_start]) { $0 } }
   nonmutating unsafeMutableAddress {
    withUnsafeMutablePointer(to: &elements[_start]) { $0 }
@@ -116,11 +108,14 @@ Base.Index.AtomicRepresentation.Value == Base.Index {
  }
 }
 
-extension Graphex {
- var elementRange: Range<Int> { position ..< (position + offset) }
- var baseRange: Range<Base.Index> { index ..< endIndex }
- @inlinable var previousOffset: Int { position - 1 }
- @inlinable var nextOffset: Int { position + 1 }
+public extension Graphex {
+ @inlinable var elementRange: Range<Int> {
+  position ..< (position + offset)
+ }
+
+ @inlinable var baseRange: Range<Base.Index> { index ..< endIndex }
+ @inlinable internal var previousOffset: Int { position - 1 }
+ @inlinable internal var nextOffset: Int { position + 1 }
 
  @inlinable var next: Self? {
   get {
@@ -176,7 +171,7 @@ extension Graphex {
   elements[offset][0]._elements =
    withUnsafeMutableBytes(of: &elements[offset]) { $0 }
   elements[offset][0].endIndex = base.endIndex
-  elements[offset][0].offset = base.count
+  // elements[offset][0].offset = offset
  }
 
  /// Creates a start element and new set of values pertaining to the
@@ -211,13 +206,14 @@ extension Graphex {
   base.append(value)
  }
 
- @inlinable static func next(
+ @inlinable internal static func next(
   _ value: Value, at offset: Int, with start: Self
  ) -> Self {
   Self(next: value, at: offset, with: start)
  }
 }
 
+// MARK: Extensions
 extension Graphex: Hashable {
  public func hash(into hasher: inout Hasher) {
   hasher.combine(_base?.baseAddress)
@@ -225,8 +221,45 @@ extension Graphex: Hashable {
  }
 }
 
+public extension IndexicalValue
+where Base.Index: Strideable, Base.Index.Stride: SignedInteger {
+ @discardableResult
+ mutating func compactMap<T>(
+  _ transform: @escaping (inout Value) throws -> T?
+ ) rethrows -> [T] {
+  var array: [T] = .empty
+  for index in index ..< base.endIndex {
+   if let newValue = try transform(&base[index]) {
+    array.append(newValue)
+   }
+  }
+  return array
+ }
+
+ func first(
+  where condition: @escaping (Value) throws -> Bool
+ ) rethrows -> Value? {
+  for index in index ..< base.endIndex {
+   let projectedValue = base[index]
+   if try condition(projectedValue) {
+    return projectedValue
+   }
+  }
+  return nil
+ }
+
+ internal func contains(
+  where condition: @escaping (Value) throws -> Bool
+ ) rethrows -> Bool {
+  for index in index ..< base.endIndex where try condition(base[index]) {
+   return true
+  }
+  return false
+ }
+}
+
 // MARK: - Indexer Protocol for storing indexing indexical values
-protocol Indexer
+public protocol Indexer
 where Base.Index: Equatable & Comparable, Element.Base == Base {
  associatedtype Base: MutableCollection & ExpressibleByArrayLiteral
  associatedtype Element: IndexicalValue

@@ -1,10 +1,10 @@
 /// https://github.com/apple/swift-evolution/blob/main/proposals/0289-result-builders.md
-protocol Builder {
+public protocol Builder {
  associatedtype Expression
  typealias FinalResult = [Expression]
 }
 
-enum Either<T,U> {
+enum Either<T, U> {
  case first(T)
  case second(U)
 }
@@ -28,15 +28,19 @@ extension VariadicBuilder {
  static func buildExpression(_ expression: Expression) -> Component {
   .expression(expression)
  }
+
  static func buildBlock(_ components: Component...) -> Component {
   .block(components)
  }
+
  static func buildOptional(_ component: Component?) -> Component {
   .optional(component)
  }
+
  static func buildArray(_ components: [Component]) -> Component {
   .block(components)
  }
+
  static func buildLimitedAvailability(_ component: Component) -> Component {
   component
  }

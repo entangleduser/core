@@ -15,6 +15,10 @@ public struct Tag<A: LosslessStringConvertible>: Sendable, Hashable {
 
 public extension Tag {
  init(_ string: String) { self.value = string }
+ init(_ value: A) {
+  self.value = value.description
+ }
+
  init(wrappedValue: some LosslessStringConvertible) {
   self.value = wrappedValue.description
  }
@@ -31,4 +35,8 @@ extension Tag: Codable {
   var container = encoder.singleValueContainer()
   try container.encode(value)
  }
+}
+
+extension Tag: Transactional {
+ public var source: Self { self }
 }

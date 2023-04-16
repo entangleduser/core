@@ -1,15 +1,15 @@
 @_exported import Atomics
-@propertyWrapper struct UnsafeAtomicReference<Value: AnyObject> {
- init() {}
- unowned var reference: Value? {
+@propertyWrapper public struct UnsafeAtomicReference<Value: AnyObject> {
+ public init() {}
+ public unowned var reference: Value? {
   willSet {
    guard reference == nil, let newValue else { return }
    _ = projectedValue.storeIfNilThenLoad(newValue)
   }
  }
 
- var projectedValue = ManagedAtomicLazyReference<Value>()
- @inlinable var wrappedValue: Value {
+ public var projectedValue = ManagedAtomicLazyReference<Value>()
+ @inlinable public var wrappedValue: Value {
   get { projectedValue.load().unsafelyUnwrapped }
   set { reference = newValue }
  }

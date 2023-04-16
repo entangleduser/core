@@ -30,7 +30,7 @@ public extension NameTransaction {
 
 public typealias UniqueNameTransaction = UUIDTransaction<NameTransaction>
 
-public extension UUIDTransaction where Target == NameTransaction {
+public extension UUIDTransaction where B == NameTransaction {
 //  static let name = Self(to: .name)
 //  static let fullName = Self(to: .fullName)
  var sender: String? {

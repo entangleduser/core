@@ -1,15 +1,15 @@
-#if !canImport(SwiftUI)
- @available(macOS 10.9, *, iOS 9.0, *)
- public protocol Identifiable {
+#if !os(macOS) && !os(iOS) && !os(watchOS) && !os(tvOS)
+ public protocol Identifiable<ID> {
   /// A type representing the stable identity of the entity associated with
   /// an instance.
   associatedtype ID: Hashable
+
   /// The stable identity of the entity associated with this instance.
-  @inlinable
-  var id: ID { get }
+  var id: Self.ID { get }
  }
 
  public extension Identifiable where Self: AnyObject {
+  /// The stable identity of the entity associated with this instance.
   var id: ObjectIdentifier { ObjectIdentifier(self) }
  }
 #endif

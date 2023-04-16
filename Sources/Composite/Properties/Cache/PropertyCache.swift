@@ -1,50 +1,8 @@
-struct PropertyIdentifier: Hashable {
- init(value: some Any, offset: Int) {
-  self.subject = type(of: value)
-  self.offset = offset
- }
-
- init(subject: Any.Type, offset: Int) {
-  self.subject = subject
-  self.offset = offset
- }
-
- let subject: Any.Type
- let offset: Int
-
- func hash(into hasher: inout Hasher) {
-  hasher.combine(String(describing: subject))
-  hasher.combine(offset)
- }
-
- static func == (lhs: Self, rhs: Self) -> Bool { lhs.hashValue == rhs.hashValue }
-}
-
-struct TypedPropertyIdentifier<Value>: PropertyKey {
- init(value: Value, offset: Int) {
-  self.offset = offset
- }
-
- init(subject: Value.Type, offset: Int) {
-  self.offset = offset
- }
-
- var subject: String { String(describing: Value.self) }
- let offset: Int
-
- var description: String { subject + offset.description }
-
- func hash(into hasher: inout Hasher) {
-  hasher.combine(subject)
-  hasher.combine(offset)
- }
-}
-
-protocol InheritenceProtocol {
+public protocol InheritenceProtocol {
  var _parent: UnsafeMutablePointer<Self>? { get set }
 }
 
-extension InheritenceProtocol {
+public extension InheritenceProtocol {
  var hasParent: Bool { self._parent != nil }
  /// Assign parent from the mirror
  mutating func assign(to parent: inout Self) {
@@ -61,12 +19,11 @@ extension InheritenceProtocol {
 /// for publishers to access
 /// An ``Indexer`` should allow the structure to update dynamic properties by
 /// introspecting this container
-protocol PropertyCache {
+public protocol PropertyCache {
  var cache: [String: () -> Any] { get set }
- // init()
 }
 
-extension PropertyCache {
+public extension PropertyCache {
  subscript<Key: PropertyKey & CustomStringConvertible>(_ key: Key) -> Key.Value? {
   get { cache[key.description]?() as? Key.Value }
   set { cache[key.description] = { newValue as Any } }
@@ -80,23 +37,27 @@ extension PropertyCache {
  }
 }
 
-extension String {
+public extension String {
  init(mangled name: String) { self.init(name.prefix { $0 != "<" }) }
  static func mangledName(for name: String) -> Self { String(mangled: name) }
 
  static func withName(for type: Any.Type) -> Self {
   Self(mangled: String(describing: type))
  }
+
+ static func withName(from value: Any) -> Self {
+  Self(mangled: String(describing: type(of: value)))
+ }
 }
 
-protocol IndexedPropertyCache: PropertyCache {
+public protocol IndexedPropertyCache: PropertyCache {
  /// A reflection of the property types when setting the cache or binding
  /// Used to update properties by index, which is useful for some frameworks
  var types: Set<String> { get set }
  static var types: Set<String> { get }
 }
 
-extension IndexedPropertyCache {
+public extension IndexedPropertyCache {
  @inlinable mutating func add(type: Any.Type) {
   let name: String = .withName(for: type)
   if Self.types.contains(name) { types.insert(name) }
@@ -123,47 +84,15 @@ extension IndexedPropertyCache {
 /// before caching defaults or creating a new property. The idea for key path attributes is to
 /// have it take from a parent determined by the builder or by creating it's own environment
 /// storage.
-protocol InheritedPropertyCache: PropertyCache, InheritenceProtocol {
+public protocol InheritedPropertyCache: PropertyCache, InheritenceProtocol {
  associatedtype Values: KeyValues
  var values: Values? { get set }
 }
 
-extension InheritedPropertyCache {
+public extension InheritedPropertyCache {
  mutating func converge() {
   values!.merge(with: parent.values.unsafelyUnwrapped)
  }
-
-// subscript<A: ResolvedKey>(_ type: A.Type) -> A.ResolvedValue {
-//  get {
-//   // if the current value for `A` is nil return the parent instead of the default
-//   // that will return if using the subscript
-//   if let values, values.contains(type) {
-//    return values[type]
-//   } else {
-//    return parent.values?[type] as? A.ResolvedValue ?? A.resolvedValue
-//   }
-//  }
-//  set {
-//   /// - note: this only stores the new value, it doesn't check to see if the parent
-//   /// already has it
-//   if values == nil { self.values = .defaultValue }
-//   values?[type] = newValue
-//  }
-// }
-//
-// subscript<A: ResolvedKey>(_ type: A.Type, default: A.ResolvedValue) -> A.ResolvedValue {
-//  get {
-//   if let values, values.contains(type) {
-//    return values[type, `default`]
-//   } else {
-//    return parent.values?[type, `default`] as? A.ResolvedValue ?? A.resolvedValue
-//   }
-//  }
-//  set {
-//   if values == nil { self.values = .defaultValue }
-//   values?[type, `default`] = newValue
-//  }
-// }
 
  subscript(key: AnyResolvedKey) -> Any {
   get {
@@ -180,10 +109,6 @@ extension InheritedPropertyCache {
    /// - note: this only stores the new value, it doesn't check to see if the parent
    /// already has it
    if values == nil { values = .defaultValue }
-//   guard let newValue else {
-//    values?[any: key] = nil
-//    return
-//   }
    values?[any: key] = newValue
   }
  }
@@ -210,19 +135,48 @@ extension InheritedPropertyCache {
    values?.values[name] = newValue
   }
  }
-
-// subscript<A: ResolvedKey>(key: A, default: A.Value) -> A.ResolvedValue {
-//  get {
-//   if let values, values.contains(key: key) {
-//    return values[key, default: `default`]
-//   } else if hasParent {
-//    return parent.values?.values[name, default: `default`] as Any
-//   }
-//   return `default`
-//  }
-//  set {
-//   if values == nil { self.values = .defaultValue }
-//   values?.values[name, default: `default`] = newValue
-//  }
-// }
 }
+
+// MARK: Identifiers
+/* struct PropertyIdentifier: Hashable {
+  init(value: some Any, offset: Int) {
+   self.subject = type(of: value)
+   self.offset = offset
+  }
+
+  init(subject: Any.Type, offset: Int) {
+   self.subject = subject
+   self.offset = offset
+  }
+
+  let subject: Any.Type
+  let offset: Int
+
+  func hash(into hasher: inout Hasher) {
+   hasher.combine(String(describing: subject))
+   hasher.combine(offset)
+  }
+
+  static func == (lhs: Self, rhs: Self) -> Bool { lhs.hashValue == rhs.hashValue }
+ }
+
+ struct TypedPropertyIdentifier<Value>: PropertyKey {
+  init(value: Value, offset: Int) {
+   self.offset = offset
+  }
+
+  init(subject: Value.Type, offset: Int) {
+   self.offset = offset
+  }
+
+  var subject: String { String(describing: Value.self) }
+  let offset: Int
+
+  var description: String { subject + offset.description }
+
+  func hash(into hasher: inout Hasher) {
+   hasher.combine(subject)
+   hasher.combine(offset)
+  }
+ }
+ */

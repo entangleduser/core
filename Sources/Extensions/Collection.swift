@@ -2,7 +2,6 @@
  import Foundation
 
  // MARK: Transforming
-
  public extension Collection {
   @inline(__always)
   @_disfavoredOverload func parallelMap<R>(
@@ -66,260 +65,520 @@
  }
 #endif
 #if canImport(_Concurrency) || canImport(Concurrency)
- extension Sequence {
-  // https://www.swiftbysundell.com/articles/async-and-concurrent-forEach-and-map/
-  @inline(__always) @_disfavoredOverload func map<T>(
-   _ transform: @Sendable @escaping (Element) async throws -> T
-  ) async rethrows -> [T] where Element: Sendable {
-   var values = [T]()
+ #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  extension Sequence {
+   // https://www.swiftbysundell.com/articles/async-and-concurrent-forEach-and-map/
+   @inline(__always) @_disfavoredOverload func map<T>(
+    _ transform: @Sendable @escaping (Element) async throws -> T
+   ) async rethrows -> [T] where Element: Sendable {
+    var values = [T]()
 
-   for element in self {
-    try await values.append(transform(element))
+    for element in self {
+     try await values.append(transform(element))
+    }
+
+    return values
    }
 
-   return values
-  }
+   @inline(__always) @_disfavoredOverload func compactMap<T>(
+    _ transform: @Sendable (Element) async throws -> T?
+   ) async rethrows -> [T] where T: Sendable, Element: Sendable {
+    var values = [T]()
 
-  @inline(__always) @_disfavoredOverload func compactMap<T>(
-   _ transform: @Sendable (Element) async throws -> T?
-  ) async rethrows -> [T] where T: Sendable, Element: Sendable {
-   var values = [T]()
+    for element in self {
+     guard let value = try await transform(element) else { continue }
+     values.append(value)
+    }
 
-   for element in self {
-    guard let value = try await transform(element) else { continue }
-    values.append(value)
+    return values
    }
 
-   return values
-  }
-
-  @inline(__always) @_disfavoredOverload func concurrentMap<T>(
-   _ transform: @Sendable @escaping (Element) async throws -> T
-  ) async throws -> [T] where T: Sendable, Element: Sendable {
-   let tasks = map { element in
-    Task {
-     try await transform(element)
+   @inline(__always) @_disfavoredOverload func concurrentMap<T>(
+    _ transform: @Sendable @escaping (Element) async throws -> T
+   ) async throws -> [T] where T: Sendable, Element: Sendable {
+    let tasks = map { element in
+     Task {
+      try await transform(element)
+     }
+    }
+    return try await tasks.map { task in
+     try await task.value
     }
    }
-   return try await tasks.map { task in
-    try await task.value
-   }
-  }
 
-  @inline(__always) func concurrentMap<T>(
-   _ transform: @Sendable @escaping (Element) async throws -> T?
-  ) async throws -> [T] where T: Sendable, Element: Sendable {
-   let tasks = map { element in
-    Task {
-     try await transform(element)
+   @inline(__always) func concurrentMap<T>(
+    _ transform: @Sendable @escaping (Element) async throws -> T?
+   ) async throws -> [T] where T: Sendable, Element: Sendable {
+    let tasks = map { element in
+     Task {
+      try await transform(element)
+     }
+    }
+    return try await tasks.compactMap { task in
+     try await task.value
     }
    }
-   return try await tasks.compactMap { task in
-    try await task.value
+  }
+ #else
+  extension Sequence {
+   // https://www.swiftbysundell.com/articles/async-and-concurrent-forEach-and-map/
+   @inline(__always) @_disfavoredOverload func map<T>(
+    _ transform: @Sendable @escaping (Element) async throws -> T
+   ) async rethrows -> [T] where Element: Sendable {
+    var values = [T]()
+
+    for element in self {
+     try await values.append(transform(element))
+    }
+
+    return values
+   }
+
+   @inline(__always) @_disfavoredOverload func compactMap<T>(
+    _ transform: @Sendable (Element) async throws -> T?
+   ) async rethrows -> [T] where T: Sendable, Element: Sendable {
+    var values = [T]()
+
+    for element in self {
+     guard let value = try await transform(element) else { continue }
+     values.append(value)
+    }
+
+    return values
+   }
+
+   @inline(__always) @_disfavoredOverload func concurrentMap<T>(
+    _ transform: @Sendable @escaping (Element) async throws -> T
+   ) async throws -> [T] where T: Sendable, Element: Sendable {
+    let tasks = map { element in
+     Task {
+      try await transform(element)
+     }
+    }
+    return try await tasks.map { task in
+     try await task.value
+    }
+   }
+
+   @inline(__always) func concurrentMap<T>(
+    _ transform: @Sendable @escaping (Element) async throws -> T?
+   ) async throws -> [T] where T: Sendable, Element: Sendable {
+    let tasks = map { element in
+     Task {
+      try await transform(element)
+     }
+    }
+    return try await tasks.compactMap { task in
+     try await task.value
+    }
    }
   }
- }
+ #endif
 #endif
 
 #if canImport(_Concurrency) || canImport(Concurrency)
- public extension RangeReplaceableCollection where Index: Comparable {
-  @inline(__always) mutating func dequeue(
-   limit: Int? = nil,
-   priority: TaskPriority = .medium,
-   _ task: @Sendable @escaping (Element) async -> Void
-  ) async where Element: Sendable {
-   await withTaskGroup(of: Void.self) { group in
-    let limit = limit ?? ProcessInfo.processInfo.processorCount
-    var count: Int = .zero
-    while !isEmpty {
-     while count < limit, !isEmpty {
-      count += 1
-      let element = self.removeFirst()
-      group.addTask(priority: priority) { await task(element) }
+ #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+  public extension RangeReplaceableCollection where Index: Comparable {
+   @inline(__always) mutating func dequeue(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async -> Void
+   ) async where Element: Sendable {
+    await withTaskGroup(of: Void.self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var count: Int = .zero
+     while !isEmpty {
+      while count < limit, !isEmpty {
+       count += 1
+       let element = self.removeFirst()
+       group.addTask(priority: priority) { await task(element) }
+      }
+      await group.next()
+      count -= 1
      }
-     await group.next()
-     count -= 1
     }
    }
-  }
 
-  /// Perform a task queue, limiting to a certain count or number of processors
-  @inline(__always) func queue(
-   limit: Int? = nil,
-   priority: TaskPriority = .medium,
-   _ task: @Sendable @escaping (Element) async -> Void
-  ) async where Element: Sendable {
-   await withTaskGroup(of: Void.self) { group in
-    let limit = limit ?? ProcessInfo.processInfo.processorCount
-    var offset = startIndex
-    var count: Int = .zero
-    while offset < endIndex {
-     while count < limit, offset < endIndex {
-      count += 1
-      let element = self[offset]
-      offset = index(after: offset)
-      group.addTask(priority: priority) { await task(element) }
+   /// Perform a task queue, limiting to a certain count or number of processors
+   @inline(__always) func queue(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async -> Void
+   ) async where Element: Sendable {
+    await withTaskGroup(of: Void.self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var offset = startIndex
+     var count: Int = .zero
+     while offset < endIndex {
+      while count < limit, offset < endIndex {
+       count += 1
+       let element = self[offset]
+       offset = index(after: offset)
+       group.addTask(priority: priority) { await task(element) }
+      }
+      await group.next()
+      count -= 1
      }
-     await group.next()
-     count -= 1
     }
    }
-  }
 
-  @inline(__always) mutating func throwingDequeue(
-   limit: Int? = nil,
-   priority: TaskPriority = .medium,
-   _ task: @Sendable @escaping (Element) async throws -> Void
-  ) async rethrows where Element: Sendable {
-   try await withThrowingTaskGroup(of: Void.self) { group in
-    let limit = limit ?? ProcessInfo.processInfo.processorCount
-    var count: Int = .zero
-    while !isEmpty {
-     while count < limit, !isEmpty {
-      count += 1
-      let element = self.removeFirst()
-      group.addTask(priority: priority) { try await task(element) }
+   @inline(__always) mutating func throwingDequeue(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async throws -> Void
+   ) async rethrows where Element: Sendable {
+    try await withThrowingTaskGroup(of: Void.self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var count: Int = .zero
+     while !isEmpty {
+      while count < limit, !isEmpty {
+       count += 1
+       let element = self.removeFirst()
+       group.addTask(priority: priority) { try await task(element) }
+      }
+      try await group.next()
+      count -= 1
      }
-     try await group.next()
-     count -= 1
     }
    }
-  }
 
-  /// Perform a throwing task queue, limiting to a certain count or number of processors
-  @inline(__always) func throwingQueue(
-   limit: Int? = nil,
-   priority: TaskPriority = .medium,
-   _ task: @Sendable @escaping (Element) async throws -> Void
-  ) async rethrows where Element: Sendable {
-   try await withThrowingTaskGroup(of: Void.self) { group in
-    let limit = limit ?? ProcessInfo.processInfo.processorCount
-    var offset = startIndex
-    var count: Int = .zero
-    while offset < endIndex {
-     while count < limit, offset < endIndex {
-      count += 1
-      let element = self[offset]
-      offset = index(after: offset)
-      group.addTask(priority: priority) { try await task(element) }
+   /// Perform a throwing task queue, limiting to a certain count or number of processors
+   @inline(__always) func throwingQueue(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async throws -> Void
+   ) async rethrows where Element: Sendable {
+    try await withThrowingTaskGroup(of: Void.self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var offset = startIndex
+     var count: Int = .zero
+     while offset < endIndex {
+      while count < limit, offset < endIndex {
+       count += 1
+       let element = self[offset]
+       offset = index(after: offset)
+       group.addTask(priority: priority) { try await task(element) }
+      }
+      try await group.next()
+      count -= 1
      }
-     try await group.next()
-     count -= 1
     }
    }
-  }
 
-  @discardableResult @inline(__always) mutating func dequeueResults<Result>(
-   limit: Int? = nil,
-   priority: TaskPriority = .medium,
-   _ task: @Sendable @escaping (Element) async -> Result
-  ) async -> [Result] where Element: Sendable {
-   await withTaskGroup(of: Result.self, returning: [Result].self) { group in
-    let limit = limit ?? ProcessInfo.processInfo.processorCount
-    var results: [Result] = .empty
-    var count: Int = .zero
-    while !isEmpty {
-     while count < limit, !isEmpty {
-      count += 1
-      let element = self.removeFirst()
-      group.addTask(priority: priority) { await task(element) }
+   @discardableResult @inline(__always) mutating func dequeueResults<Result>(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async -> Result
+   ) async -> [Result] where Element: Sendable {
+    await withTaskGroup(of: Result.self, returning: [Result].self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var results: [Result] = .empty
+     var count: Int = .zero
+     while !isEmpty {
+      while count < limit, !isEmpty {
+       count += 1
+       let element = self.removeFirst()
+       group.addTask(priority: priority) { await task(element) }
+      }
+      if let result = await group.next() { results.append(result); count -= 1 }
      }
-     if let result = await group.next() { results.append(result); count -= 1 }
+     return results
     }
-    return results
    }
-  }
 
-  /// Perform a task queue, returning the accumulated results of the closure
-  @inline(__always) @discardableResult func queueResults<Result>(
-   limit: Int? = nil,
-   priority: TaskPriority = .medium,
-   _ task: @Sendable @escaping (Element) async -> Result
-  ) async -> [Result] where Element: Sendable {
-   await withTaskGroup(of: Result.self, returning: [Result].self) { group in
-    let limit = limit ?? ProcessInfo.processInfo.processorCount
-    var results: [Result] = .empty
-    var offset = startIndex
-    var count: Int = .zero
-    while offset < endIndex {
-     while count < limit, offset < endIndex {
-      count += 1
-      let element = self[offset]
-      offset = index(after: offset)
-      group.addTask(priority: priority) { await task(element) }
+   /// Perform a task queue, returning the accumulated results of the closure
+   @inline(__always) @discardableResult func queueResults<Result>(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async -> Result
+   ) async -> [Result] where Element: Sendable {
+    await withTaskGroup(of: Result.self, returning: [Result].self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var results: [Result] = .empty
+     var offset = startIndex
+     var count: Int = .zero
+     while offset < endIndex {
+      while count < limit, offset < endIndex {
+       count += 1
+       let element = self[offset]
+       offset = index(after: offset)
+       group.addTask(priority: priority) { await task(element) }
+      }
+      if let result = await group.next() { results.append(result); count -= 1 }
      }
-     if let result = await group.next() { results.append(result); count -= 1 }
+     return results
     }
-    return results
    }
-  }
 
-  @discardableResult @inline(__always) mutating func dequeueThrowingResults<Result>(
-   limit: Int? = nil,
-   priority: TaskPriority = .medium,
-   _ task: @Sendable @escaping (Element) async throws -> Result
-  ) async rethrows -> [Result] where Result: Sendable, Element: Sendable {
-   try await withThrowingTaskGroup(of: Result.self, returning: [Result].self) { group in
-    let limit = limit ?? ProcessInfo.processInfo.processorCount
-    var results: [Result] = .empty
-    var count: Int = .zero
-    while !isEmpty {
-     while count < limit, !isEmpty {
-      count += 1
-      let element = self.removeFirst()
-      group.addTask(priority: priority) { try await task(element) }
+   @discardableResult @inline(__always) mutating func dequeueThrowingResults<Result>(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async throws -> Result
+   ) async rethrows -> [Result] where Result: Sendable, Element: Sendable {
+    try await withThrowingTaskGroup(of: Result.self, returning: [Result].self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var results: [Result] = .empty
+     var count: Int = .zero
+     while !isEmpty {
+      while count < limit, !isEmpty {
+       count += 1
+       let element = self.removeFirst()
+       group.addTask(priority: priority) { try await task(element) }
+      }
+      if let result = try await group.next() { results.append(result); count -= 1 }
      }
-     if let result = try await group.next() { results.append(result); count -= 1 }
+     return results
     }
-    return results
    }
-  }
 
-  /// Perform a throwing task queue, returning the accumulated results of the closure
-  @inline(__always) @discardableResult func queueThrowingResults<Result>(
-   limit: Int? = nil,
-   priority: TaskPriority = .medium,
-   _ task: @Sendable @escaping (Element) async throws -> Result
-  ) async rethrows -> [Result] where Result: Sendable, Element: Sendable {
-   try await withThrowingTaskGroup(of: Result.self, returning: [Result].self) { group in
-    let limit = limit ?? ProcessInfo.processInfo.processorCount
-    var results: [Result] = .empty
-    var offset = startIndex
-    var count: Int = .zero
-    while offset < endIndex {
-     while count < limit, offset < endIndex {
-      count += 1
-      let element = self[offset]
-      offset = index(after: offset)
-      group.addTask(priority: priority) { try await task(element) }
+   /// Perform a throwing task queue, returning the accumulated results of the closure
+   @inline(__always) @discardableResult func queueThrowingResults<Result>(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async throws -> Result
+   ) async rethrows -> [Result] where Result: Sendable, Element: Sendable {
+    try await withThrowingTaskGroup(of: Result.self, returning: [Result].self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var results: [Result] = .empty
+     var offset = startIndex
+     var count: Int = .zero
+     while offset < endIndex {
+      while count < limit, offset < endIndex {
+       count += 1
+       let element = self[offset]
+       offset = index(after: offset)
+       group.addTask(priority: priority) { try await task(element) }
+      }
+      if let result = try await group.next() { results.append(result); count -= 1 }
      }
-     if let result = try await group.next() { results.append(result); count -= 1 }
+     return results
     }
-    return results
    }
   }
- }
+ #else
+  public extension RangeReplaceableCollection where Index: Comparable {
+   @inline(__always) mutating func dequeue(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async -> Void
+   ) async where Element: Sendable {
+    await withTaskGroup(of: Void.self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var count: Int = .zero
+     while !isEmpty {
+      while count < limit, !isEmpty {
+       count += 1
+       let element = self.removeFirst()
+       group.addTask(priority: priority) { await task(element) }
+      }
+      await group.next()
+      count -= 1
+     }
+    }
+   }
+
+   /// Perform a task queue, limiting to a certain count or number of processors
+   @inline(__always) func queue(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async -> Void
+   ) async where Element: Sendable {
+    await withTaskGroup(of: Void.self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var offset = startIndex
+     var count: Int = .zero
+     while offset < endIndex {
+      while count < limit, offset < endIndex {
+       count += 1
+       let element = self[offset]
+       offset = index(after: offset)
+       group.addTask(priority: priority) { await task(element) }
+      }
+      await group.next()
+      count -= 1
+     }
+    }
+   }
+
+   @inline(__always) mutating func throwingDequeue(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async throws -> Void
+   ) async rethrows where Element: Sendable {
+    try await withThrowingTaskGroup(of: Void.self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var count: Int = .zero
+     while !isEmpty {
+      while count < limit, !isEmpty {
+       count += 1
+       let element = self.removeFirst()
+       group.addTask(priority: priority) { try await task(element) }
+      }
+      try await group.next()
+      count -= 1
+     }
+    }
+   }
+
+   /// Perform a throwing task queue, limiting to a certain count or number of processors
+   @inline(__always) func throwingQueue(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async throws -> Void
+   ) async rethrows where Element: Sendable {
+    try await withThrowingTaskGroup(of: Void.self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var offset = startIndex
+     var count: Int = .zero
+     while offset < endIndex {
+      while count < limit, offset < endIndex {
+       count += 1
+       let element = self[offset]
+       offset = index(after: offset)
+       group.addTask(priority: priority) { try await task(element) }
+      }
+      try await group.next()
+      count -= 1
+     }
+    }
+   }
+
+   @discardableResult @inline(__always) mutating func dequeueResults<Result>(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async -> Result
+   ) async -> [Result] where Element: Sendable {
+    await withTaskGroup(of: Result.self, returning: [Result].self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var results: [Result] = .empty
+     var count: Int = .zero
+     while !isEmpty {
+      while count < limit, !isEmpty {
+       count += 1
+       let element = self.removeFirst()
+       group.addTask(priority: priority) { await task(element) }
+      }
+      if let result = await group.next() { results.append(result); count -= 1 }
+     }
+     return results
+    }
+   }
+
+   /// Perform a task queue, returning the accumulated results of the closure
+   @inline(__always) @discardableResult func queueResults<Result>(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async -> Result
+   ) async -> [Result] where Element: Sendable {
+    await withTaskGroup(of: Result.self, returning: [Result].self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var results: [Result] = .empty
+     var offset = startIndex
+     var count: Int = .zero
+     while offset < endIndex {
+      while count < limit, offset < endIndex {
+       count += 1
+       let element = self[offset]
+       offset = index(after: offset)
+       group.addTask(priority: priority) { await task(element) }
+      }
+      if let result = await group.next() { results.append(result); count -= 1 }
+     }
+     return results
+    }
+   }
+
+   @discardableResult @inline(__always) mutating func dequeueThrowingResults<Result>(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async throws -> Result
+   ) async rethrows -> [Result] where Result: Sendable, Element: Sendable {
+    try await withThrowingTaskGroup(of: Result.self, returning: [Result].self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var results: [Result] = .empty
+     var count: Int = .zero
+     while !isEmpty {
+      while count < limit, !isEmpty {
+       count += 1
+       let element = self.removeFirst()
+       group.addTask(priority: priority) { try await task(element) }
+      }
+      if let result = try await group.next() { results.append(result); count -= 1 }
+     }
+     return results
+    }
+   }
+
+   /// Perform a throwing task queue, returning the accumulated results of the closure
+   @inline(__always) @discardableResult func queueThrowingResults<Result>(
+    limit: Int? = nil,
+    priority: TaskPriority = .medium,
+    _ task: @Sendable @escaping (Element) async throws -> Result
+   ) async rethrows -> [Result] where Result: Sendable, Element: Sendable {
+    try await withThrowingTaskGroup(of: Result.self, returning: [Result].self) { group in
+     let limit = limit ?? ProcessInfo.processInfo.processorCount
+     var results: [Result] = .empty
+     var offset = startIndex
+     var count: Int = .zero
+     while offset < endIndex {
+      while count < limit, offset < endIndex {
+       count += 1
+       let element = self[offset]
+       offset = index(after: offset)
+       group.addTask(priority: priority) { try await task(element) }
+      }
+      if let result = try await group.next() { results.append(result); count -= 1 }
+     }
+     return results
+    }
+   }
+  }
+ #endif
 #endif
 // MARK: Uniquing
-
-public extension RandomAccessCollection where Iterator.Element: Hashable {
+public extension RandomAccessCollection where Element: Hashable {
  func unique() -> [Iterator.Element] {
-  var seen: Set<Iterator.Element> = []
+  var seen: Set<Element> = []
   return filter { seen.insert($0).inserted }
  }
 }
 
-// MARK: Unique Operations
+public extension Array where Element: Hashable {
+ @discardableResult mutating func removeDuplicates() -> Self {
+  self = unique()
+  return self
+ }
+}
 
+public extension Array where Element: Equatable {
+ func unique() -> Self {
+  var expression = self
+  for element in self {
+   while expression.count(for: element) > 1 {
+    if let index = expression.firstIndex(where: { $0 == element }) {
+     expression.remove(at: index)
+    }
+   }
+  }
+  return expression
+ }
+
+ @discardableResult mutating func removeDuplicates() -> Self {
+  self = unique()
+  return self
+ }
+}
+
+// MARK: Unique Operations
 public extension Sequence where Element: Equatable {
- @_transparent
  func map(where condition: @escaping (Element) throws -> Bool) rethrows -> [Element]? {
   try compactMap { element in
    try condition(element) ? element : nil
   }.wrapped
  }
 
- @_transparent
  func reduce(where condition: @escaping (Element) throws -> Bool) rethrows -> [Element] {
   try reduce([Element]()) {
    if let last = $0.last, try condition(last), try condition($1) {
@@ -351,7 +610,7 @@ public extension Sequence where Self: Equatable {
 
 // using reduce to map elements with a given range
 public extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
- @_transparent func map<Element>(
+ @inlinable func map<Element>(
   _ element: @escaping () throws -> Element?
  ) rethrows -> [Element] {
   try reduce(into: [Element]()) { results, _ in
@@ -442,27 +701,27 @@ public extension RangeReplaceableCollection where Element: Equatable {
  }
 }
 
-extension Dictionary {
- @_transparent
+public extension Dictionary {
+ @inlinable
  @discardableResult
  mutating func add(_ other: (key: Key, value: Value)) -> Self {
   self[other.key] = other.value
   return self
  }
 
- @_transparent
+ @inlinable
  func adding(_ other: (key: Key, value: Value)) -> Self {
   var `self` = self
   return self.add(other)
  }
 
- @_transparent
+ @inlinable
  @discardableResult
  static func += (_ self: inout Self, other: (key: Key, value: Value)) -> Self {
   self.add(other)
  }
 
- @_transparent
+ @inlinable
  static func + (_ self: Self, other: (key: Key, value: Value)) -> Self {
   self.adding(other)
  }
@@ -470,8 +729,7 @@ extension Dictionary {
 
 public extension RangeReplaceableCollection where Element: Equatable {
  // an attempt to wrap a collection given a delimiter and limit
- @_transparent
- func wrapping(
+ @inlinable func wrapping(
   to count: Int, delimiter: Element
  ) -> [SubSequence] {
   guard self.count > count else { return [self[startIndex ..< endIndex]] }
@@ -504,7 +762,7 @@ public extension RangeReplaceableCollection where Element: Equatable {
 public extension RangeReplaceableCollection where Element: Equatable {
  /// Removes and returns all elements matching `condition`
  /// This is like `removeAll(where:)` except it returns the removed elements
- @_transparent mutating func drop(
+ @inlinable mutating func drop(
   where condition: @escaping (Element) throws -> Bool
  ) rethrows -> [Element] {
   var elements = [Element]()
@@ -514,7 +772,7 @@ public extension RangeReplaceableCollection where Element: Equatable {
   return elements
  }
 
- @_transparent func removing(
+ @inlinable func removing(
   where condition: @escaping (Element) throws -> Bool
  ) rethrows -> Self {
   var `self` = self
@@ -526,7 +784,7 @@ public extension RangeReplaceableCollection where Element: Equatable {
 public extension RangeReplaceableCollection where Element: Equatable {
  /// Groups subsequences of continous elements matching `condition`,
  /// ommiting the other elements and keeping indexes
- @_transparent func grouping(
+ @inlinable func grouping(
   where condition: @escaping (Element) throws -> Bool
  ) rethrows -> [SubSequence] {
   var subsequences = [SubSequence]()
@@ -546,53 +804,45 @@ public extension RangeReplaceableCollection where Element: Equatable {
   return subsequences
  }
 
- // @discardableResult
- // /// Removes groups matching where the `condition` is true
- // @_transparent mutating func removingGroups(
- //  where condition: @escaping (Element) throws -> Bool
- // ) rethrows -> [SubSequence] {
- // }
-
  // Removes single outside elements or returns and empty subsequence if
  // the count is less than three
- @_transparent var bracketsRemoved: SubSequence {
+ @inlinable var bracketsRemoved: SubSequence {
   guard count > 2 else { return SubSequence() }
   return self[index(after: startIndex) ..< index(endIndex, offsetBy: -1)]
  }
 }
 
 public extension Collection where Element: Equatable {
- @_transparent func count(for element: Element) -> Int {
+ @inlinable func count(for element: Element) -> Int {
   reduce(0) { $1 == element ? $0 + 1 : $0 }
  }
 
  @discardableResult
- // @_transparent
+ @inlinable
  /// Matches sequential elements where the `condition` is true
- func matchingGroups(
-  of element: Element
- ) -> [ArraySlice<Self.Element>] {
+ func matchingGroups(of element: Element) -> [ArraySlice<Self.Element>] {
   split(whereSeparator: { $0 != element }).removing(where: { $0.count == 1 })
  }
 
- func separating(
+ @inlinable func separating(
   where condition: (Element) throws -> Bool
  ) rethrows -> [SubSequence] {
   try split(whereSeparator: condition) // .removing(where: { $0.count == 1 })
  }
 
- @_transparent func count(
+ @inlinable func count(
   where condition: @escaping (Element) throws -> Bool
  ) rethrows -> Int {
   try reduce(0) { try condition($1) ? $0 + 1 : $0 }
  }
 
- @_transparent func isRecursive(for element: Element) -> Bool {
+ @inlinable func isRecursive(for element: Element) -> Bool {
   count(for: element).isMultiple(of: 2)
  }
 }
 
 public extension RangeReplaceableCollection {
+ @inlinable
  @discardableResult
  /// Removes elements from the collection if result isn't `nil` and returns all results
  /// Like compact map but removes the original element from the collection
@@ -627,35 +877,33 @@ public extension RangeReplaceableCollection {
  }
 }
 
-public extension BidirectionalCollection
- where Self: RangeReplaceableCollection, Self: Equatable,
- Element: Hashable, SubSequence: Equatable {
- private func match(
-  into subsequences: inout [SubSequence?], with sequence: SubSequence
- ) {
-  switch sequence.count {
-  case 1: subsequences.append(nil)
-  case 2: subsequences.append(SubSequence())
-  default: subsequences.append(sequence)
+/* public extension BidirectionalCollection
+  where Self: RangeReplaceableCollection, Self: Equatable,
+  Element: Hashable, SubSequence: Equatable {
+  private func match(
+   into subsequences: inout [SubSequence?], with sequence: SubSequence
+  ) {
+   switch sequence.count {
+    case 1: subsequences.append(nil)
+    case 2: subsequences.append(SubSequence())
+    default: subsequences.append(sequence)
+   }
+  }
+
+  func components(for element: Element) -> (braces: [SubSequence], guts: [SubSequence])? {
+   let braces = separating(where: { $0 != element })
+   guard braces.count > 1 else { return nil }
+
+   return (braces, separating(where: { $0 == element }))
+  }
+
+  func braces(for element: Element) -> [(lhs: SubSequence, SubSequence, rhs: SubSequence)]? {
+   guard let components = components(for: element) else { return nil }
+   let guts = components.1
+   let braces = components.0
+   return (0 ..< guts.count).map { index in
+    (braces[index], guts[index], braces[index + 1])
+   }
   }
  }
-
- func components(for element: Element) -> (braces: [SubSequence], guts: [SubSequence])? {
-  let braces = separating(where: { $0 != element })
-  guard braces.count > 1 else { return nil }
-
-  return (braces, separating(where: { $0 == element }))
- }
-
- func braces(for element: Element) -> [(lhs: SubSequence, SubSequence, rhs: SubSequence)]? {
-  guard let components = components(for: element) else { return nil }
-  let guts = components.1
-  let braces = components.0
-  debugPrint(guts)
-  debugPrint(braces)
-  return (0 ..< guts.count).map { index in
-
-   (braces[index], guts[index], braces[index + 1])
-  }
- }
-}
+ */

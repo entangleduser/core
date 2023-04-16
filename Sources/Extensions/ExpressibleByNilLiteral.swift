@@ -1,23 +1,16 @@
+import struct Foundation.UUID
 extension UUID: ExpressibleByNilLiteral {
- public init(nilLiteral _: ()) {
-  self.init()
- }
+ @inlinable public init(nilLiteral _: ()) { self.init() }
 }
 
 public extension RawRepresentable where RawValue: ExpressibleAsEmpty {
- init(nilLiteral _: ()) {
-  self.init(rawValue: .empty)!
- }
+ init(nilLiteral _: ()) { self.init(rawValue: .empty)! }
 }
 
 extension Bool: ExpressibleByNilLiteral {
- public init(nilLiteral _: ()) {
-  self.init(false)
- }
+ @inlinable public init(nilLiteral _: ()) { self.init(false) }
 }
 
 extension Bool: Infallible {
- public static var defaultValue: Bool {
-  false
- }
+ @inlinable public static var defaultValue: Bool { false }
 }

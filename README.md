@@ -13,9 +13,11 @@ Self explanatory
 Readable tags and tokens
 
 ## Reflection
-### Borrowed from the Tokamak framework
+#### Borrowed from the Tokamak framework
 Type info and property metadata
 
 ## Dynamic
-### Archived 
-Result builder and dynamic properties
+```swift
+/// - Note: Archived 
+/// Result builder and dynamic properties
+```

@@ -45,8 +45,7 @@ struct DynamicArray<Root, Content: Sendable> where Root: RootDynamic {
   self.content = content
  }
 
- @inlinable
- init(_ root: Root, @DynamicBuilder content: () -> Content) {
+ @inlinable init(_ root: Root, @DynamicBuilder content: () -> Content) {
   self.root = root
   self.content = content()
  }

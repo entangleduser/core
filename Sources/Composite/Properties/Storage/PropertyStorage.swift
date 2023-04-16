@@ -1,4 +1,4 @@
-struct PropertyStorage: PropertyCache {
- var cache: [String: () -> Any] = .empty
- var _parent: UnsafeMutablePointer<Self>?
+public struct PropertyStorage: PropertyCache {
+ public var _parent: UnsafeMutablePointer<Self>?
+ public var cache: [String: () -> Any] = .empty
 }

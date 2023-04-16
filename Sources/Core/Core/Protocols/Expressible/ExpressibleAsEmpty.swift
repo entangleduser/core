@@ -4,38 +4,28 @@ public protocol ExpressibleAsEmpty: Infallible {
 }
 
 public extension ExpressibleAsEmpty where Self: Equatable {
- @_disfavoredOverload
- @inlinable
- var isEmpty: Bool { self == .empty }
- @inlinable @_disfavoredOverload
- var notEmpty: Bool { !isEmpty }
+ @inlinable @_disfavoredOverload var isEmpty: Bool { self == .empty }
+ @inlinable @_disfavoredOverload var notEmpty: Bool { !isEmpty }
 }
 
 public extension ExpressibleAsEmpty where Self: Collection {
- @inlinable
- var notEmpty: Bool { isEmpty == false }
- @inlinable
- var wrapped: Self? {
-  isEmpty ? .none : self
- }
+ @inlinable var notEmpty: Bool { isEmpty == false }
+ @inlinable var wrapped: Self? { isEmpty ? .none : self }
 }
 
 // MARK: Conformance Helpers
 
 // FIXME: Conform to protocol `ExpressibleAsEmpty`
 public extension ExpressibleByArrayLiteral {
- @inlinable @_disfavoredOverload
- static var empty: Self { [] }
+ @inlinable @_disfavoredOverload static var empty: Self { [] }
 }
 
 public extension ExpressibleByStringLiteral {
- @_disfavoredOverload
- static var empty: Self { "" }
+ @_disfavoredOverload @inlinable static var empty: Self { "" }
 }
 
 public extension ExpressibleByDictionaryLiteral {
- @_disfavoredOverload
- static var empty: Self { [:] }
+ @_disfavoredOverload @inlinable static var empty: Self { [:] }
 }
 
 // MARK: Conforming Types

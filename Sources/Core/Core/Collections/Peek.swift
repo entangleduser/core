@@ -1,6 +1,6 @@
 import Atomics
-public struct Peek<A: MutableCollection>
-where A: ExpressibleByArrayLiteral, A.Index: Equatable & Comparable {
+public struct Peek<A: Collection>
+where A: ExpressibleAsEmpty, A.Index: Equatable & Comparable {
  public let storage: Storage
 }
 
@@ -52,15 +52,15 @@ public extension Peek /*: Collection */ {
  }
 }
 
-public extension Peek /*: MutableCollection */ {
+public extension Peek where A: RangeReplaceableCollection /*: MutableCollection */ {
  subscript(_ position: Index) -> Element {
   get { elements[position] }
-  nonmutating set { self.elements[position] = newValue }
+  nonmutating set { self.elements.insert(newValue, at: position) }
  }
 
  var element: Element {
   get { elements[index] }
-  nonmutating set { self.elements[self.index] = newValue }
+  nonmutating set { self.elements.insert(newValue, at: self.index) }
  }
 }
 
@@ -118,7 +118,7 @@ public extension Peek where A: RangeReplaceableCollection & BidirectionalCollect
     remove(at: idx)
     return
    }
-   elements[idx] = newValue
+   self[idx] = newValue
   }
  }
 }
@@ -172,12 +172,11 @@ public extension Peek where A: RangeReplaceableCollection {
     elements.remove(at: idx)
     return
    }
-   elements[idx] = newValue
+   self[idx] = newValue
   }
  }
 
- @inlinable
- subscript<R: RangeExpression>(range: R) -> SubSequence?
+ @inlinable subscript<R: RangeExpression>(range: R) -> SubSequence?
   where R.Bound == SubSequence.Index {
   get {
    // ?? range.relative(to: elements)
@@ -226,26 +225,24 @@ public extension Peek where A: RangeReplaceableCollection {
   }
  }
 
-//  /// Advances to the next index of `element` or the `endIndex`
-//  public func advance(to element: Element) -> Index? where Element: Equatable {
-//   guard let matchIndex = afterElements?.firstIndex(of: element) else {
-//    return nil
-//   }
-//   defer { self.index = elements.index(after: matchIndex) }
-//   return matchIndex
-//  }
-//
-//  public func advance(where true: @escaping (Element) throws -> Bool) rethrows -> Index? {
-//   guard let matchIndex = try afterElements?.firstIndex(where: `true`) else {
-//    return nil
-//   }
-//   defer { self.index = index(after: matchIndex) }
-//   return matchIndex
-//  }
-//
-//  public func resetIndex() { self.index = self.startIndex }
-//
-//
+ /// Advances to the next index of `element` or the `endIndex`
+ func advance(to element: Element) -> Index? where Element: Equatable {
+  guard let matchIndex = afterElements?.firstIndex(of: element) else {
+   return nil
+  }
+  defer { self.index = elements.index(after: matchIndex) }
+  return matchIndex
+ }
+
+ func advance(where true: @escaping (Element) throws -> Bool) rethrows -> Index? {
+  guard let matchIndex = try afterElements?.firstIndex(where: `true`) else {
+   return nil
+  }
+  defer { self.index = index(after: matchIndex) }
+  return matchIndex
+ }
+
+ func resetIndex() { index = startIndex }
 }
 
 // func transformElements(
@@ -602,7 +599,7 @@ public extension Peek {
   try callAsFunction(self)
  }
 
- init() { self.init(A()) }
+ init() { self.init(.empty) }
 }
 
 // MARK: Extensions

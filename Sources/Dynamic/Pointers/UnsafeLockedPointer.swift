@@ -6,13 +6,9 @@ struct UnsafeLockedPointer<Pointee: Sendable>: Destroyable {
   base.wrappedValue.assumingMemoryBound(to: Pointee?.self)
  }
 
- @inlinable
- var pointee: Pointee! {
-  @_transparent unsafeAddress {
-   UnsafePointer(pointer)
-  }
-
-  @_transparent nonmutating unsafeMutableAddress { pointer }
+ @inlinable var pointee: Pointee! {
+  unsafeAddress { UnsafePointer(pointer) }
+  nonmutating unsafeMutableAddress { pointer }
  }
 
  @discardableResult

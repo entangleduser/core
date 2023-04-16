@@ -12,6 +12,7 @@ public extension StringProtocol {
  }
 
  static var period: Self { "." }
+ static var hyphen: Self { "-" }
  static var space: Self { " " }
  static var newline: Self { "\n" }
  static var bullet: Self { "•" }

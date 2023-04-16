@@ -1,4 +1,4 @@
-/// A value that automatically conforms to sequence.
+/// A value that automatically conforms to sequence
 public protocol Sequential: Sequence where Base: Sequence {
  associatedtype Base
  override associatedtype Element = Base.Element
@@ -13,10 +13,7 @@ public extension Sequential {
   _elements = elements
  }
 
- @inlinable
- func makeIterator() -> Base.Iterator {
-  _elements.makeIterator()
- }
+ @inlinable func makeIterator() -> Base.Iterator { _elements.makeIterator() }
 }
 
 public extension Sequential where Base: ExpressibleByArrayLiteral {

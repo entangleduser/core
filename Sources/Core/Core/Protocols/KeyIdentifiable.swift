@@ -3,10 +3,16 @@ public protocol KeyIdentifiable {
  /// an instance.
  associatedtype Key: Hashable
  /// The stable identity of the entity associated with this instance.
- @inlinable
  var key: Key { get }
 }
 
-public extension KeyIdentifiable where Self: Identifiable {
- var id: Key { key }
-}
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ public extension KeyIdentifiable where Self: Identifiable {
+  @inlinable var id: Key { key }
+ }
+#else
+ public extension KeyIdentifiable where Self: Identifiable {
+  @inlinable var id: Key { key }
+ }
+#endif

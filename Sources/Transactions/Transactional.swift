@@ -1,22 +1,23 @@
 @_exported import Extensions
 public protocol Transactional: Sendable {
- associatedtype Source: Sendable
- associatedtype Target: Transactional
+ associatedtype A: Sendable
+ associatedtype B: Transactional
  /// The source member for a transaction
- var source: Source { get }
+ var source: A { get }
  /// The target for a transaction, which can be `nil` if it's a simple id
  /// and the narrative is optional
- var target: Target? { get set }
+ var target: B? { get set }
  /// - NOTE: Fail-only initializer for transactions because they require a source
- init(from source: Source, to target: Target?)
+ init(from source: A, to target: B?)
 }
 
-public extension Transactional where Self.Source: Infallible {
+public extension Transactional where Self.A: Infallible {
+ @_disfavoredOverload
  static var defaultValue: Self { Self(from: .defaultValue, to: nil) }
 }
 
 public extension Transactional {
- init(from source: Source, to target: Target?) {
+ init(from source: A, to target: B?) {
   fatalError()
  }
 }
@@ -85,12 +86,19 @@ extension Never: Transactional {
  public var target: Never? { get { fatalError() } set {} }
 }
 
+public extension Transactional where B == Never {
+ var target: Never? {
+  get { nil }
+  set(newValue) {}
+ }
+}
+
 // extension Transactional
-// where Source: LosslessStringConvertible, Target: LosslessStringConvertible {
+// where A: LosslessStringConvertible, B: LosslessStringConvertible {
 // public init(from decoder: Decoder) throws {
 //  var container = try decoder.unkeyedContainer()
-//  if let source = try Source(container.decode(String.self)),
-//     let target = try Target(container.decode(String.self)) {
+//  if let source = try A(container.decode(String.self)),
+//     let target = try B(container.decode(String.self)) {
 //   self.init(from: source, to: target)
 //  }
 //  self.init(fro)
