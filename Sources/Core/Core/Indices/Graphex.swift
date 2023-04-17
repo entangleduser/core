@@ -223,13 +223,12 @@ extension Graphex: Hashable {
 
 public extension IndexicalValue
 where Base.Index: Strideable, Base.Index.Stride: SignedInteger {
- @discardableResult
- mutating func compactMap<T>(
-  _ transform: @escaping (inout Value) throws -> T?
+ @_disfavoredOverload func compactMap<T>(
+  _ transform: @escaping (Value) throws -> T?
  ) rethrows -> [T] {
   var array: [T] = .empty
-  for index in index ..< base.endIndex {
-   if let newValue = try transform(&base[index]) {
+  for index in self.index ..< base.endIndex {
+   if let newValue = try transform(base[index]) {
     array.append(newValue)
    }
   }
@@ -239,7 +238,7 @@ where Base.Index: Strideable, Base.Index.Stride: SignedInteger {
  func first(
   where condition: @escaping (Value) throws -> Bool
  ) rethrows -> Value? {
-  for index in index ..< base.endIndex {
+  for index in self.index ..< base.endIndex {
    let projectedValue = base[index]
    if try condition(projectedValue) {
     return projectedValue
@@ -248,13 +247,47 @@ where Base.Index: Strideable, Base.Index.Stride: SignedInteger {
   return nil
  }
 
- internal func contains(
+ func contains(
   where condition: @escaping (Value) throws -> Bool
  ) rethrows -> Bool {
-  for index in index ..< base.endIndex where try condition(base[index]) {
+  for index in self.index ..< base.endIndex where try condition(base[index]) {
    return true
   }
   return false
+ }
+}
+
+public extension Graphex
+where Base.Index: Strideable, Base.Index.Stride: SignedInteger {
+ @discardableResult func compactMap<T>(
+  _ transform: @escaping (inout Value) throws -> T?
+ ) rethrows -> [T] {
+  var array: [T] = .empty
+  for index in self.index ..< base.endIndex {
+   if let newValue = try transform(&base[index]) {
+    array.append(newValue)
+   }
+  }
+  return array
+ }
+ 
+ subscript(first: @escaping (Value) -> Bool) -> Value? {
+  get {
+   for index in self.index ..< base.endIndex {
+    let projectedValue = base[index]
+    if first(projectedValue) { return projectedValue }
+   }
+   return nil
+  }
+  nonmutating set {
+   guard let newValue else { return }
+   for index in self.index ..< base.endIndex {
+    if first(base[index]) {
+     base[index] = newValue
+     break
+    }
+   }
+  }
  }
 }
 

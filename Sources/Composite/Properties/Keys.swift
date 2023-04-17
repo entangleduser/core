@@ -96,54 +96,102 @@ public extension DoubleDateKey {
  }
 }
 
-/// A key useful for storing auto codable values. Usually, within a defaults
-/// protocol because it can provide uniform access to values
-/// - Note: Using this allows data of all types to use the same key because the
-/// stored value is data and the resolved value is the structure
-@available(macOS 10.15, iOS 13.0, *)
-public protocol AutoCodableKey: ResolvedKey
-where ResolvedValue: AutoCodable, Value == Data {}
-
-@available(macOS 10.15, iOS 13.0, *)
-public extension DecodingError.Context {
- static var missingData: Self {
-  Self(codingPath: .empty, debugDescription: "Data was missing")
+#if canImport(Combine)
+ /// A key useful for storing auto codable values. Usually, within a defaults
+ /// protocol because it can provide uniform access to values
+ /// - Note: Using this allows data of all types to use the same key because the
+ /// stored value is data and the resolved value is the structure
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ public protocol AutoCodableKey: ResolvedKey
+ where ResolvedValue: AutoCodable {
+  override associatedtype Value = Data
  }
-}
 
-@available(macOS 10.15, iOS 13.0, *)
-public extension AutoCodableKey {
- @_disfavoredOverload
- static func resolveValue(_ data: Data?) -> ResolvedValue {
-  do {
-   guard let data else {
-    throw DecodingError.valueNotFound(ResolvedValue.self, .missingData)
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ public extension DecodingError.Context {
+  static var missingData: Self {
+   Self(codingPath: .empty, debugDescription: "Data was missing")
+  }
+ }
+
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ public extension AutoCodableKey {
+  static func storeValue(_ value: ResolvedValue?) -> Data? {
+   guard let value else { return nil }
+   do { return try ResolvedValue.encoder.encode(value) }
+   catch {
+    fatalError(error.localizedDescription)
    }
-   return try ResolvedValue.decoder.decode(ResolvedValue.self, from: data)
-  } catch {
-   fatalError(error.localizedDescription)
   }
  }
 
- static func storeValue(_ value: ResolvedValue?) -> Data? {
-  guard let value else { return nil }
-  do { return try ResolvedValue.encoder.encode(value) }
-  catch {
-   fatalError(error.localizedDescription)
-  }
- }
-}
-
-@available(macOS 10.15, iOS 13.0, *)
-public extension AutoCodableKey where ResolvedValue: Infallible {
- static func resolveValue(_ data: Data?) -> ResolvedValue {
-  do {
-   guard let data else {
-    throw DecodingError.valueNotFound(ResolvedValue.self, .missingData)
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ public extension AutoCodableKey where ResolvedValue: Infallible {
+  static func resolveValue(_ data: Data?) -> ResolvedValue {
+   do {
+    guard let data else {
+     throw DecodingError.valueNotFound(ResolvedValue.self, .missingData)
+    }
+    return try ResolvedValue.decoder.decode(ResolvedValue.self, from: data)
+   } catch {
+    print(error.localizedDescription)
+    return .defaultValue
    }
-   return try ResolvedValue.decoder.decode(ResolvedValue.self, from: data)
-  } catch {
-   return .defaultValue
   }
  }
+
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ public extension AutoCodableKey where ResolvedValue: ExpressibleByNilLiteral {
+  static func resolveValue(_ data: Data?) -> ResolvedValue {
+   do {
+    guard let data else {
+     throw DecodingError.valueNotFound(ResolvedValue.self, .missingData)
+    }
+    return try ResolvedValue.decoder.decode(ResolvedValue.self, from: data)
+   } catch {
+    print(error.localizedDescription)
+    return nil
+   }
+  }
+ }
+
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+extension AutoCodable where Self: AutoCodableKey, Self: Infallible {
+ public typealias ResolvedValue = Self
 }
+
+
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ public protocol AutoCodableArrayKey: ResolvedKey where Value == [Data] {
+  associatedtype Element: AutoCodable
+  override associatedtype ResolvedValue = [Element]
+ }
+
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ public extension AutoCodableArrayKey {
+  static func storeValue(_ values: [Element]?) -> [Data]? {
+   guard let values else { return nil }
+   do {
+    return try values.map { try Element.encoder.encode($0) }
+   } catch {
+    fatalError(error.localizedDescription)
+   }
+  }
+
+  static func resolveValue(_ data: [Data]?) -> [Element] {
+   do {
+    guard let data else {
+     throw DecodingError.valueNotFound(ResolvedValue.self, .missingData)
+    }
+    return try data.map {
+     try Element.decoder.decode(Element.self, from: $0)
+    }
+   } catch {
+    print(error.localizedDescription)
+    return .empty
+   }
+  }
+ }
+
+#elseif canImport(OpenCombine)
+#endif

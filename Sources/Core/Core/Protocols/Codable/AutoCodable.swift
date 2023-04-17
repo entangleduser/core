@@ -98,13 +98,47 @@ import struct Foundation.URL
 
  // MARK: Array Conformances
  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
- extension Array: AutoEncodable where Element: AutoEncodable {
-  public static var encoder: Element.AutoEncoder { Element.encoder }
+ public struct ArrayEncoder<A: AutoEncodable>: TopLevelEncoder
+ where A.AutoEncoder.Output == Data {
+  public init() {}
+  public func encode(_ value: some Encodable) throws -> Data {
+   guard let values = value as? [A] else { fatalError() }
+   return try Data(
+    values.flatMap { try A.encoder.encode($0).map { $0 } }
+   )
+  }
  }
 
  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
- extension Array: AutoDecodable where Element: AutoDecodable {
-  public static var decoder: Element.AutoDecoder { Element.decoder }
+ public struct ArrayDecoder<A: AutoDecodable>: TopLevelDecoder
+ where A.AutoDecoder.Input == Data {
+  public init() {}
+  static var size: Int { MemoryLayout<A>.size }
+  public func decode<T>(
+   _ type: T.Type, from data: Data
+  ) throws -> T where T: Decodable {
+   var data = data
+   var elements = [A]()
+   while !data.isEmpty {
+    let bytes = data[0 ..< Self.size]
+    data.removeSubrange(0 ..< Self.size)
+    let value = try A.decoder.decode(A.self, from: Data(bytes))
+    elements.append(value)
+   }
+   return elements as! T
+  }
+ }
+
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ extension Array: AutoEncodable
+ where Element: AutoEncodable, Element.AutoEncoder.Output == Data {
+  public static var encoder: ArrayEncoder<Element> { ArrayEncoder<Element>() }
+ }
+
+ @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+ extension Array: AutoDecodable
+ where Element: AutoDecodable, Element.AutoDecoder.Input == Data {
+  public static var decoder: ArrayDecoder<Element> { ArrayDecoder<Element>() }
  }
 
  @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
@@ -249,16 +283,49 @@ import struct Foundation.URL
  }
 
  // MARK: Array Conformances
- extension Array: AutoEncodable where Element: AutoEncodable {
-  public static var encoder: Element.AutoEncoder { Element.encoder }
+ public struct ArrayEncoder<A: AutoEncodable>: TopLevelEncoder
+ where A.AutoEncoder.Output == Data {
+  public init() {}
+  public func encode(_ value: some Encodable) throws -> Data {
+   guard let values = value as? [A] else { fatalError() }
+   return try Data(
+    values.flatMap { try A.encoder.encode($0).map { $0 } }
+   )
+  }
  }
 
- extension Array: AutoDecodable where Element: AutoDecodable {
-  public static var decoder: Element.AutoDecoder { Element.decoder }
+ public struct ArrayDecoder<A: AutoDecodable>: TopLevelDecoder
+ where A.AutoDecoder.Input == Data {
+  public init() {}
+  static var size: Int { MemoryLayout<A>.size }
+  public func decode<T>(
+   _ type: T.Type, from data: Data
+  ) throws -> T where T: Decodable {
+   var data = data
+   var elements = [A]()
+   while !data.isEmpty {
+    let bytes = data[0 ..< Self.size]
+    data.removeSubrange(0 ..< Self.size)
+    let value = try A.decoder.decode(A.self, from: Data(bytes))
+    elements.append(value)
+   }
+   return elements as! T
+  }
+ }
+
+ extension Array: AutoEncodable
+ where Element: AutoEncodable, Element.AutoEncoder.Output == Data {
+  public static var encoder: ArrayEncoder<Element> { ArrayEncoder<Element>() }
+ }
+
+ extension Array: AutoDecodable
+ where Element: AutoDecodable, Element.AutoDecoder.Input == Data {
+  public static var decoder: ArrayDecoder<Element> { ArrayDecoder<Element>() }
  }
 
  extension Array: AutoCodable where Element: AutoCodable {}
 
+// MARK: Self Conformances
  public protocol StaticEncodable: AutoEncodable {
   static func encode(_ value: Self) throws -> Data
  }
