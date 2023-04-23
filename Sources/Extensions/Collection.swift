@@ -52,7 +52,7 @@
   }
 
   @inline(__always) func parallelPerform(
-   _ transform: (Element) throws -> Void) rethrows {
+   _ transform: (Element) throws -> ()) rethrows {
    let lock = NSRecursiveLock()
    DispatchQueue.concurrentPerform(iterations: count) { i in
     do {
@@ -184,7 +184,7 @@
    @inline(__always) mutating func dequeue(
     limit: Int? = nil,
     priority: TaskPriority = .medium,
-    _ task: @Sendable @escaping (Element) async -> Void
+    _ task: @Sendable @escaping (Element) async -> ()
    ) async where Element: Sendable {
     await withTaskGroup(of: Void.self) { group in
      let limit = limit ?? ProcessInfo.processInfo.processorCount
@@ -205,7 +205,7 @@
    @inline(__always) func queue(
     limit: Int? = nil,
     priority: TaskPriority = .medium,
-    _ task: @Sendable @escaping (Element) async -> Void
+    _ task: @Sendable @escaping (Element) async -> ()
    ) async where Element: Sendable {
     await withTaskGroup(of: Void.self) { group in
      let limit = limit ?? ProcessInfo.processInfo.processorCount
@@ -227,7 +227,7 @@
    @inline(__always) mutating func throwingDequeue(
     limit: Int? = nil,
     priority: TaskPriority = .medium,
-    _ task: @Sendable @escaping (Element) async throws -> Void
+    _ task: @Sendable @escaping (Element) async throws -> ()
    ) async rethrows where Element: Sendable {
     try await withThrowingTaskGroup(of: Void.self) { group in
      let limit = limit ?? ProcessInfo.processInfo.processorCount
@@ -248,7 +248,7 @@
    @inline(__always) func throwingQueue(
     limit: Int? = nil,
     priority: TaskPriority = .medium,
-    _ task: @Sendable @escaping (Element) async throws -> Void
+    _ task: @Sendable @escaping (Element) async throws -> ()
    ) async rethrows where Element: Sendable {
     try await withThrowingTaskGroup(of: Void.self) { group in
      let limit = limit ?? ProcessInfo.processInfo.processorCount
@@ -362,7 +362,7 @@
    @inline(__always) mutating func dequeue(
     limit: Int? = nil,
     priority: TaskPriority = .medium,
-    _ task: @Sendable @escaping (Element) async -> Void
+    _ task: @Sendable @escaping (Element) async -> ()
    ) async where Element: Sendable {
     await withTaskGroup(of: Void.self) { group in
      let limit = limit ?? ProcessInfo.processInfo.processorCount
@@ -383,7 +383,7 @@
    @inline(__always) func queue(
     limit: Int? = nil,
     priority: TaskPriority = .medium,
-    _ task: @Sendable @escaping (Element) async -> Void
+    _ task: @Sendable @escaping (Element) async -> ()
    ) async where Element: Sendable {
     await withTaskGroup(of: Void.self) { group in
      let limit = limit ?? ProcessInfo.processInfo.processorCount
@@ -405,7 +405,7 @@
    @inline(__always) mutating func throwingDequeue(
     limit: Int? = nil,
     priority: TaskPriority = .medium,
-    _ task: @Sendable @escaping (Element) async throws -> Void
+    _ task: @Sendable @escaping (Element) async throws -> ()
    ) async rethrows where Element: Sendable {
     try await withThrowingTaskGroup(of: Void.self) { group in
      let limit = limit ?? ProcessInfo.processInfo.processorCount
@@ -426,7 +426,7 @@
    @inline(__always) func throwingQueue(
     limit: Int? = nil,
     priority: TaskPriority = .medium,
-    _ task: @Sendable @escaping (Element) async throws -> Void
+    _ task: @Sendable @escaping (Element) async throws -> ()
    ) async rethrows where Element: Sendable {
     try await withThrowingTaskGroup(of: Void.self) { group in
      let limit = limit ?? ProcessInfo.processInfo.processorCount
@@ -561,6 +561,15 @@ public extension Array where Element: Equatable {
      expression.remove(at: index)
     }
    }
+  }
+  return expression
+ }
+
+ func appendingUnique<A: Sequence>(_ contents: A) -> Self
+ where A.Element == Element {
+  var expression = self
+  for element in contents where !contains(element) {
+   expression.append(element)
   }
   return expression
  }
